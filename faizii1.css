@@ -1,0 +1,388 @@
+:root {
+    --gold: #d4a017;
+    --dark: #0e0e0e;
+    --card: #1b1b1b;
+    --text: #f2f2f2
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Segoe UI, Arial, sans-serif
+}
+
+html {
+    scroll-behavior: smooth
+}
+
+body {
+    background: var(--dark);
+    color: var(--text)
+}
+
+header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 5%;
+    background: #000;
+    border-bottom: 2px solid var(--gold)
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--gold);
+    font-weight: 800;
+    font-size: 1.3rem
+}
+
+.logo small {
+    display: block;
+    font-size: .6rem;
+    letter-spacing: 3px;
+    color: #fff
+}
+
+nav a {
+    color: #fff;
+    text-decoration: none;
+    margin: 0 10px;
+    font-weight: 600
+}
+
+nav a:hover {
+    color: var(--gold)
+}
+
+.btn {
+    background: var(--gold);
+    color: #000;
+    border: 0;
+    padding: 12px 22px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block
+}
+
+.btn:hover {
+    opacity: .85
+}
+
+.btn.small {
+    padding: 8px 14px
+}
+
+.btn.outline {
+    background: transparent;
+    color: var(--gold);
+    border: 2px solid var(--gold)
+}
+
+.hero {
+    min-height: 76vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(30px, 7vw, 90px);
+    padding: 40px 5%;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, rgba(0, 0, 0, .92) 0%, rgba(0, 0, 0, .72) 48%, rgba(0, 0, 0, .45) 100%), url("https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=2200&q=85") center/cover, #222
+}
+
+.hero-content {
+    max-width: 620px;
+    text-align: left
+}
+
+.eyebrow {
+    color: var(--gold);
+    font-size: .85rem;
+    font-weight: 800;
+    letter-spacing: 4px;
+    margin-bottom: 12px
+}
+
+.hero h1 {
+    font-size: clamp(2rem, 6vw, 4rem);
+    color: var(--gold);
+    line-height: 1.05;
+    margin-bottom: 16px
+}
+
+.hero-content > p:not(.eyebrow) {
+    color: #eee;
+    font-size: 1.1rem;
+    margin-bottom: 24px
+}
+
+.hero-photo {
+    width: min(38vw, 430px);
+    min-width: 280px;
+    padding: 10px 10px 16px;
+    background: rgba(14, 14, 14, .8);
+    border: 1px solid rgba(212, 160, 23, .8);
+    border-radius: 14px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+    transform: none
+}
+
+.hero-photo img {
+    width: 100%;
+    height: 330px;
+    display: block;
+    object-fit: cover;
+    border-radius: 8px
+}
+
+.hero-photo span {
+    display: block;
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+    padding-top: 13px
+}
+
+section {
+    padding: 60px 5%
+}
+
+section[hidden] {
+    display: none
+}
+
+h2 {
+    text-align: center;
+    color: var(--gold);
+    margin-bottom: 30px;
+    font-size: 2rem
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 22px
+}
+
+.card {
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+    text-align: center;
+    border: 1px solid #333;
+    transition: .3s
+}
+
+.card:hover {
+    transform: translateY(-6px);
+    border-color: var(--gold)
+}
+
+.card .pic {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    background: linear-gradient(135deg, #2a2a2a, #111)
+}
+
+.card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+    background: #252525;
+    transition: transform .35s ease
+}
+
+.card:hover img {
+    transform: scale(1.04)
+}
+
+.card h3 {
+    margin: 12px 0 4px
+}
+
+.price {
+    color: var(--gold);
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 12px
+}
+
+.card .btn {
+    margin: 0 0 16px
+}
+
+.offers {
+    background: #161616
+}
+
+.offer {
+    padding: 20px;
+    border: 2px dashed var(--gold);
+    border-radius: 10px;
+    text-align: center
+}
+
+.offer b {
+    color: var(--gold);
+    font-size: 1.4rem
+}
+
+.contact {
+    text-align: center;
+    line-height: 2.2;
+    font-size: 1.1rem
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    background: #000;
+    color: #888
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .8);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    padding: 15px
+}
+
+.modal.open {
+    display: flex
+}
+
+.box {
+    position: relative;
+    background: #1b1b1b;
+    border: 2px solid var(--gold);
+    border-radius: 10px;
+    padding: 26px;
+    width: 100%;
+    max-width: 400px;
+    max-height: 92vh;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px
+}
+
+.box h3 {
+    color: var(--gold);
+    text-align: center
+}
+
+.box input {
+    padding: 11px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #0e0e0e;
+    color: #fff
+}
+
+.box input[readonly] {
+    color: var(--gold)
+}
+
+.x {
+    position: absolute;
+    right: 14px;
+    top: 8px;
+    font-size: 1.8rem;
+    cursor: pointer
+}
+
+.link {
+    color: var(--gold);
+    cursor: pointer;
+    text-align: center;
+    font-size: .9rem
+}
+
+.msg {
+    text-align: center;
+    font-size: .9rem;
+    color: #6fdc8c
+}
+
+.msg.err {
+    color: #ff6b6b
+}
+
+.tablewrap {
+    overflow-x: auto
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px
+}
+
+th,
+td {
+    padding: 10px;
+    border-bottom: 1px solid #333;
+    text-align: left
+}
+
+th {
+    color: var(--gold)
+}
+
+td button {
+    padding: 5px 10px;
+    margin-right: 4px;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer
+}
+
+.edit {
+    background: var(--gold)
+}
+
+.del {
+    background: #e74c3c;
+    color: #fff
+}
+
+@media(max-width:700px) {
+    nav {
+        display: none
+    }
+
+    .hero {
+        flex-direction: column;
+        text-align: center;
+        padding-top: 70px;
+        padding-bottom: 70px
+    }
+
+    .hero-content {
+        text-align: center
+    }
+
+    .hero-photo {
+        width: min(88vw, 430px);
+        transform: none
+    }
+}

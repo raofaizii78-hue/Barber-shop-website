@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Faizii Barber Shop</title>
+    <link rel="stylesheet" href="faizii1.css">
+</head>
+
+<body>
+
+    <header>
+        <a class="logo" href="#home">
+            <svg viewBox="0 0 64 64" width="46" height="46" aria-label="Faizii logo">
+      <circle cx="32" cy="32" r="30" fill="#111" stroke="#d4a017" stroke-width="3"/>
+      <g stroke="#d4a017" stroke-width="3" fill="none" stroke-linecap="round">
+        <circle cx="21" cy="46" r="5"/><circle cx="43" cy="46" r="5"/>
+        <path d="M24 42 L42 14"/><path d="M40 42 L22 14"/>
+      </g>
+      <path d="M10 56 h44" stroke="#fff" stroke-width="2" stroke-dasharray="4 3"/>
+    </svg>
+            <span>FAIZII <small>BARBER SHOP</small></span>
+        </a>
+        <nav>
+            <a href="#home">Home</a><a href="#services">Services</a><a href="#offers">Offers</a>
+            <a href="#my" id="navMy" hidden>My Bookings</a><a href="#contact">Contact Us</a>
+        </nav>
+        <div id="authBox">
+            <button class="btn small" id="btnSignin">Sign In</button>
+            <button class="btn small outline" id="btnSignup">Sign Up</button>
+        </div>
+    </header>
+
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <p class="eyebrow">FAIZII BARBER SHOP</p>
+            <h1>Look Sharp. Feel Great.</h1>
+            <p>Haircut • Facial • Hair Colour • Laser Treatment & more</p>
+            <a href="#mBook" class="btn" id="heroBook">Book Now</a>
+        </div>
+        <div class="hero-photo">
+            <img src="https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&amp;fit=crop&amp;w=1100&amp;q=90" alt="Professional barber cutting a customer's hair">
+            <span>Precision cuts. Premium service.</span>
+        </div>
+    </section>
+
+    <section id="services">
+        <h2>Our Services</h2>
+        <div class="grid" id="serviceGrid"></div>
+    </section>
+
+    <section id="offers" class="offers">
+        <h2>🔥 New Offers</h2>
+        <div class="grid" id="offerGrid"></div>
+    </section>
+
+    <section id="my" hidden>
+        <h2>My Bookings</h2>
+        <div class="tablewrap">
+            <table id="bookTable"></table>
+        </div>
+    </section>
+
+    <section id="contact">
+        <h2>Contact Us</h2>
+        <div class="contact">
+            <p>📍 Shop Address, Your City</p>
+            <p>📞 +92 300 0000000</p>
+            <p>✉️ yourshop@gmail.com</p>
+            <p>🕘 Open: 10:00 AM – 10:00 PM (Daily)</p>
+        </div>
+    </section>
+
+    <footer>© 2026 Faizii Barber Shop. All rights reserved.</footer>
+
+    <!-- BOOKING MODAL -->
+    <div class="modal" id="mBook">
+        <div class="box">
+            <span class="x" data-close>&times;</span>
+            <h3 id="bookTitle">Book Appointment</h3>
+            <input type="hidden" id="bId">
+            <input id="bService" readonly><input id="bPrice" readonly>
+            <input id="bName" placeholder="Your Name">
+            <input id="bPhone" placeholder="Contact Number">
+            <input id="bEmail" type="email" placeholder="Gmail">
+            <input id="bDate" type="date"><input id="bTime" type="time">
+            <button class="btn" id="bSubmit">Confirm Booking</button>
+            <p class="msg" id="bMsg"></p>
+        </div>
+    </div>
+
+    <!-- SIGN IN -->
+    <div class="modal" id="mSignin">
+        <div class="box">
+            <span class="x" data-close>&times;</span>
+            <h3>Sign In</h3>
+            <input id="siEmail" type="email" placeholder="Email">
+            <input id="siPass" type="password" placeholder="Password">
+            <button class="btn" id="siSubmit">Sign In</button>
+            <p class="link" id="toForgot">Forgot password?</p>
+            <p class="link" id="toSignup">New here? Create account</p>
+            <p class="msg" id="siMsg"></p>
+        </div>
+    </div>
+
+    <!-- SIGN UP -->
+    <div class="modal" id="mSignup">
+        <div class="box">
+            <span class="x" data-close>&times;</span>
+            <h3>Sign Up</h3>
+            <input id="suName" placeholder="Full Name">
+            <input id="suEmail" type="email" placeholder="Email">
+            <input id="suPass" type="password" placeholder="Password (min 6)">
+            <button class="btn" id="suSubmit">Create Account</button>
+            <p class="link" id="toSignin">Already have an account? Sign in</p>
+            <p class="msg" id="suMsg"></p>
+        </div>
+    </div>
+
+    <!-- FORGOT PASSWORD -->
+    <div class="modal" id="mForgot">
+        <div class="box">
+            <span class="x" data-close>&times;</span>
+            <h3>Forgot Password</h3>
+            <input id="fgEmail" type="email" placeholder="Your registered email">
+            <button class="btn" id="fgSend">Send Reset Code</button>
+            <input id="fgCode" placeholder="6-digit code from email">
+            <input id="fgPass" type="password" placeholder="New password">
+            <button class="btn" id="fgReset">Reset Password</button>
+            <p class="msg" id="fgMsg"></p>
+        </div>
+    </div>
+
+    <script src="faizii1.js"></script>
+</body>
+
+</html>
