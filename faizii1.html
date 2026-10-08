@@ -65,9 +65,9 @@
     <section id="contact">
         <h2>Contact Us</h2>
         <div class="contact">
-            <p>📍 Shop Address, Your City</p>
-            <p>📞 +92 300 0000000</p>
-            <p>✉️ yourshop@gmail.com</p>
+            <p>📍Laberty kit gulburg LHR Pakistan</p>
+            <p>📞 +92 3097877574</p>
+            <p>✉️ info@faiziibarbershop.com</p>
             <p>🕘 Open: 10:00 AM – 10:00 PM (Daily)</p>
         </div>
     </section>
@@ -76,59 +76,80 @@
 
     <!-- BOOKING MODAL -->
     <div class="modal" id="mBook">
-        <div class="box">
-            <span class="x" data-close>&times;</span>
+        <form class="box" id="formBooking">
+            <button class="x" type="button" data-close aria-label="Close booking form">&times;</button>
             <h3 id="bookTitle">Book Appointment</h3>
             <input type="hidden" id="bId">
-            <input id="bService" readonly><input id="bPrice" readonly>
-            <input id="bName" placeholder="Your Name">
-            <input id="bPhone" placeholder="Contact Number">
-            <input id="bEmail" type="email" placeholder="Gmail">
-            <input id="bDate" type="date"><input id="bTime" type="time">
-            <button class="btn" id="bSubmit">Confirm Booking</button>
-            <p class="msg" id="bMsg"></p>
-        </div>
+            <label for="bService">Service</label>
+            <input id="bService" readonly aria-label="Selected service">
+            <label for="bPrice">Price</label>
+            <input id="bPrice" readonly aria-label="Service price">
+            <label for="bName">Your name</label>
+            <input id="bName" placeholder="Your name" autocomplete="name" maxlength="120" required>
+            <label for="bPhone">Contact number</label>
+            <input id="bPhone" type="tel" placeholder="+92 300 0000000" autocomplete="tel" minlength="7" maxlength="15" required>
+            <label for="bEmail">Email for confirmation</label>
+            <input id="bEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+            <label for="bDate">Appointment date</label>
+            <input id="bDate" type="date" required>
+            <label for="bTime">Appointment time</label>
+            <input id="bTime" type="time" required>
+            <button class="btn" id="bSubmit" type="submit">Confirm Appointment</button>
+            <p class="msg" id="bMsg" role="status" aria-live="polite"></p>
+        </form>
     </div>
 
     <!-- SIGN IN -->
     <div class="modal" id="mSignin">
-        <div class="box">
-            <span class="x" data-close>&times;</span>
+        <form class="box" id="formSignin">
+            <button class="x" type="button" data-close aria-label="Close sign in">&times;</button>
             <h3>Sign In</h3>
-            <input id="siEmail" type="email" placeholder="Email">
-            <input id="siPass" type="password" placeholder="Password">
-            <button class="btn" id="siSubmit">Sign In</button>
-            <p class="link" id="toForgot">Forgot password?</p>
-            <p class="link" id="toSignup">New here? Create account</p>
-            <p class="msg" id="siMsg"></p>
-        </div>
+            <label for="siEmail">Email</label>
+            <input id="siEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+            <label for="siPass">Password</label>
+            <input id="siPass" type="password" placeholder="Your password" autocomplete="current-password" required>
+            <button class="btn" id="siSubmit" type="submit">Sign In</button>
+            <button class="link" id="toForgot" type="button">Forgot password?</button>
+            <button class="link" id="toSignup" type="button">New here? Create an account</button>
+            <p class="msg" id="siMsg" role="status" aria-live="polite"></p>
+        </form>
     </div>
 
     <!-- SIGN UP -->
     <div class="modal" id="mSignup">
-        <div class="box">
-            <span class="x" data-close>&times;</span>
+        <form class="box" id="formSignup">
+            <button class="x" type="button" data-close aria-label="Close sign up">&times;</button>
             <h3>Sign Up</h3>
-            <input id="suName" placeholder="Full Name">
-            <input id="suEmail" type="email" placeholder="Email">
-            <input id="suPass" type="password" placeholder="Password (min 6)">
-            <button class="btn" id="suSubmit">Create Account</button>
-            <p class="link" id="toSignin">Already have an account? Sign in</p>
-            <p class="msg" id="suMsg"></p>
-        </div>
+            <label for="suName">Full name</label>
+            <input id="suName" placeholder="Your full name" autocomplete="name" maxlength="120" required>
+            <label for="suEmail">Email</label>
+            <input id="suEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+            <label for="suPass">Password</label>
+            <input id="suPass" type="password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" maxlength="72" required>
+            <button class="btn" id="suSubmit" type="submit">Create Account</button>
+            <button class="link" id="toSignin" type="button">Already have an account? Sign in</button>
+            <p class="msg" id="suMsg" role="status" aria-live="polite"></p>
+        </form>
     </div>
 
     <!-- FORGOT PASSWORD -->
     <div class="modal" id="mForgot">
         <div class="box">
-            <span class="x" data-close>&times;</span>
+            <button class="x" type="button" data-close aria-label="Close password recovery">&times;</button>
             <h3>Forgot Password</h3>
-            <input id="fgEmail" type="email" placeholder="Your registered email">
-            <button class="btn" id="fgSend">Send Reset Code</button>
-            <input id="fgCode" placeholder="6-digit code from email">
-            <input id="fgPass" type="password" placeholder="New password">
-            <button class="btn" id="fgReset">Reset Password</button>
-            <p class="msg" id="fgMsg"></p>
+            <form id="formForgotRequest" class="modal-form">
+                <label for="fgEmail">Account email</label>
+                <input id="fgEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+                <button class="btn" id="fgSend" type="submit">Email Me a Reset Code</button>
+            </form>
+            <form id="formReset" class="modal-form">
+                <label for="fgCode">6-digit code from your email</label>
+                <input id="fgCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="123456" required>
+                <label for="fgPass">New password</label>
+                <input id="fgPass" type="password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" maxlength="72" required>
+                <button class="btn" id="fgReset" type="submit">Reset Password</button>
+            </form>
+            <p class="msg" id="fgMsg" role="status" aria-live="polite"></p>
         </div>
     </div>
 

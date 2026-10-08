@@ -35,6 +35,12 @@ header {
     border-bottom: 2px solid var(--gold)
 }
 
+#authBox {
+    display: flex;
+    align-items: center;
+    gap: 10px
+}
+
 .logo {
     display: flex;
     align-items: center;
@@ -285,6 +291,13 @@ footer {
     gap: 10px
 }
 
+.box label {
+    color: #ddd;
+    font-size: .9rem;
+    font-weight: 600;
+    margin-bottom: -6px
+}
+
 .box h3 {
     color: var(--gold);
     text-align: center
@@ -302,11 +315,33 @@ footer {
     color: var(--gold)
 }
 
+.box input:focus-visible,
+.btn:focus-visible,
+.link:focus-visible,
+.x:focus-visible,
+nav a:focus-visible {
+    outline: 2px solid #f3cb58;
+    outline-offset: 3px
+}
+
+.box input:focus {
+    border-color: var(--gold)
+}
+
+.btn:disabled {
+    cursor: wait;
+    opacity: .65
+}
+
 .x {
     position: absolute;
     right: 14px;
     top: 8px;
     font-size: 1.8rem;
+    line-height: 1;
+    color: #fff;
+    background: transparent;
+    border: 0;
     cursor: pointer
 }
 
@@ -314,17 +349,36 @@ footer {
     color: var(--gold);
     cursor: pointer;
     text-align: center;
-    font-size: .9rem
+    font-size: .9rem;
+    background: transparent;
+    border: 0;
+    padding: 4px
 }
 
 .msg {
     text-align: center;
     font-size: .9rem;
-    color: #6fdc8c
+    color: #6fdc8c;
+    line-height: 1.5
 }
 
 .msg.err {
     color: #ff6b6b
+}
+
+.msg.warning {
+    color: #f3cb58
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px
+}
+
+.modal-form + .modal-form {
+    border-top: 1px solid #444;
+    padding-top: 16px
 }
 
 .tablewrap {
@@ -367,7 +421,25 @@ td button {
 
 @media(max-width:700px) {
     nav {
-        display: none
+        display: flex;
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px
+    }
+
+    nav a {
+        margin: 0 4px;
+        font-size: .9rem
+    }
+
+    header {
+        padding: 10px 4%
+    }
+
+    #authBox {
+        gap: 6px
     }
 
     .hero {
@@ -384,5 +456,13 @@ td button {
     .hero-photo {
         width: min(88vw, 430px);
         transform: none
+    }
+
+    section {
+        padding: 44px 5%
+    }
+
+    .box {
+        padding: 24px 20px
     }
 }

@@ -1,6 +1,14 @@
 const $ = s => document.querySelector(s);
 let token = localStorage.getItem('fz_token');
-let user = JSON.parse(localStorage.getItem('fz_user') || 'null');
+let user = null;
+try {
+    user = JSON.parse(localStorage.getItem('fz_user') || 'null');
+} catch {
+    localStorage.removeItem('fz_user');
+    localStorage.removeItem('fz_token');
+    token = null;
+}
+let pendingBookingDraft = null;
 
 /* ----- data: change names, prices, images here ----- */
 const SERVICES = [
@@ -35,21 +43,41 @@ $('#offerGrid').innerHTML = OFFERS.map(o => `<div class="offer"><b>${o.t}</b><p>
 
 /* ----- helpers ----- */
 async function api(url, method = 'GET', body) {
-    const r = await fetch('/api' + url, {
-        method,
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
-        body: body ? JSON.stringify(body) : undefined
-    });
-    const d = await r.json();
+    let r;
+    try {
+        r = await fetch('/api' + url, {
+            method,
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+            body: body ? JSON.stringify(body) : undefined
+        });
+    } catch {
+        throw new Error('Could not connect to the shop. Make sure the website server is running and try again.');
+    }
+    const text = await r.text();
+    let d;
+    try {
+        d = text ? JSON.parse(text) : {};
+    } catch {
+        throw new Error(`Server returned an invalid response (HTTP ${r.status})`);
+    }
     if (!r.ok) throw new Error(d.error || 'Something went wrong');
+    if (!text) throw new Error(`Server returned an empty response (HTTP ${r.status})`);
     return d;
 }
 const open = id => { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
     $(id).classList.add('open'); };
 const close = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
-const say = (el, text, err) => { el.textContent = text;
-    el.className = 'msg' + (err ? ' err' : ''); };
+const say = (el, text, state) => {
+    el.textContent = text;
+    el.className = `msg${state === 'error' ? ' err' : state === 'warning' ? ' warning' : ''}`;
+};
 document.querySelectorAll('[data-close]').forEach(x => x.onclick = close);
+document.querySelectorAll('.modal').forEach(modal => modal.addEventListener('click', event => {
+    if (event.target === modal) close();
+}));
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') close();
+});
 
 /* ----- quick booking from the home-page button ----- */
 $('#heroBook').onclick = e => {
@@ -70,14 +98,30 @@ $('#heroBook').onclick = e => {
 
 /* ----- auth UI ----- */
 function renderAuth() {
-    $('#authBox').innerHTML = user ?
-        `<span>👤 ${user.name}${user.role === 'admin' ? ' (Admin)' : ''}</span> <button class="btn small outline" id="btnOut">Logout</button>` :
-        `<button class="btn small" id="btnSignin">Sign In</button> <button class="btn small outline" id="btnSignup">Sign Up</button>`;
+    const authBox = $('#authBox');
+    authBox.replaceChildren();
+    if (user) {
+        const name = document.createElement('span');
+        name.textContent = `👤 ${user.name}${user.role === 'admin' ? ' (Admin)' : ''}`;
+        const logoutButton = document.createElement('button');
+        logoutButton.className = 'btn small outline';
+        logoutButton.textContent = 'Sign Out';
+        logoutButton.onclick = logout;
+        authBox.append(name, logoutButton);
+    } else {
+        const signinButton = document.createElement('button');
+        signinButton.className = 'btn small';
+        signinButton.textContent = 'Sign In';
+        signinButton.onclick = () => open('#mSignin');
+        const signupButton = document.createElement('button');
+        signupButton.className = 'btn small outline';
+        signupButton.textContent = 'Create Account';
+        signupButton.onclick = () => open('#mSignup');
+        authBox.append(signinButton, signupButton);
+    }
     $('#navMy').hidden = !user;
     $('#my').hidden = !user;
-    if (user) { $('#btnOut').onclick = logout;
-        loadBookings(); } else { $('#btnSignin').onclick = () => open('#mSignin');
-        $('#btnSignup').onclick = () => open('#mSignup'); }
+    if (user) loadBookings();
 }
 
 function setSession(d) {
@@ -87,6 +131,17 @@ function setSession(d) {
     localStorage.setItem('fz_user', JSON.stringify(user));
     close();
     renderAuth();
+    if (pendingBookingDraft) {
+        const draft = pendingBookingDraft;
+        pendingBookingDraft = null;
+        $('#bName').value = draft.name;
+        $('#bPhone').value = draft.phone;
+        $('#bEmail').value = draft.email;
+        $('#bDate').value = draft.date;
+        $('#bTime').value = draft.time;
+        say($('#bMsg'), 'You are signed in. Review your details and confirm the appointment.');
+        open('#mBook');
+    }
 }
 
 function logout() { token = null;
@@ -95,30 +150,81 @@ function logout() { token = null;
     localStorage.removeItem('fz_user');
     renderAuth(); }
 
-$('#toSignup').onclick = () => open('#mSignup');
-$('#toSignin').onclick = () => open('#mSignin');
-$('#toForgot').onclick = () => open('#mForgot');
+$('#toSignup').onclick = () => {
+    say($('#siMsg'), '');
+    open('#mSignup');
+};
+$('#toSignin').onclick = () => {
+    say($('#suMsg'), '');
+    open('#mSignin');
+};
+$('#toForgot').onclick = () => {
+    say($('#siMsg'), '');
+    open('#mForgot');
+};
 
-$('#siSubmit').onclick = async() => {
-    try { setSession(await api('/signin', 'POST', { email: $('#siEmail').value, password: $('#siPass').value })); } catch (e) { say($('#siMsg'), e.message, true); }
-};
-$('#suSubmit').onclick = async() => {
-    try { setSession(await api('/signup', 'POST', { name: $('#suName').value, email: $('#suEmail').value, password: $('#suPass').value })); } catch (e) { say($('#suMsg'), e.message, true); }
-};
-$('#fgSend').onclick = async() => {
-    try { say($('#fgMsg'), (await api('/forgot', 'POST', { email: $('#fgEmail').value })).message); } catch (e) { say($('#fgMsg'), e.message, true); }
-};
-$('#fgReset').onclick = async() => {
+$('#formSignin').addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = $('#siSubmit');
+    submit.disabled = true;
     try {
-        say($('#fgMsg'), (await api('/reset', 'POST', { email: $('#fgEmail').value, code: $('#fgCode').value, password: $('#fgPass').value })).message);
+        setSession(await api('/signin', 'POST', { email: $('#siEmail').value, password: $('#siPass').value }));
+    } catch (e) {
+        say($('#siMsg'), e.message, 'error');
+    } finally {
+        submit.disabled = false;
+    }
+});
+$('#formSignup').addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = $('#suSubmit');
+    submit.disabled = true;
+    try {
+        setSession(await api('/signup', 'POST', {
+            name: $('#suName').value,
+            email: $('#suEmail').value,
+            password: $('#suPass').value
+        }));
+    } catch (e) {
+        say($('#suMsg'), e.message, 'error');
+    } finally {
+        submit.disabled = false;
+    }
+});
+$('#formForgotRequest').addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = $('#fgSend');
+    submit.disabled = true;
+    try {
+        say($('#fgMsg'), (await api('/forgot', 'POST', { email: $('#fgEmail').value })).message);
+    } catch (e) {
+        say($('#fgMsg'), e.message, 'error');
+    } finally {
+        submit.disabled = false;
+    }
+});
+$('#formReset').addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = $('#fgReset');
+    submit.disabled = true;
+    try {
+        say($('#fgMsg'), (await api('/reset', 'POST', {
+            email: $('#fgEmail').value,
+            code: $('#fgCode').value,
+            password: $('#fgPass').value
+        })).message);
         setTimeout(() => open('#mSignin'), 1500);
-    } catch (e) { say($('#fgMsg'), e.message, true); }
-};
+    } catch (e) { say($('#fgMsg'), e.message, 'error'); }
+    finally {
+        submit.disabled = false;
+    }
+});
 
 /* ----- booking ----- */
 document.addEventListener('click', e => {
-    const i = e.target.dataset.book;
-    if (i === undefined) return;
+    const bookButton = e.target.closest('[data-book]');
+    if (!bookButton) return;
+    const i = bookButton.dataset.book;
     const s = SERVICES[i];
     $('#bookTitle').textContent = 'Book Appointment';
     $('#bId').value = '';
@@ -134,7 +240,8 @@ document.addEventListener('click', e => {
     open('#mBook');
 });
 
-$('#bSubmit').onclick = async() => {
+$('#formBooking').addEventListener('submit', async event => {
+    event.preventDefault();
     const data = {
         name: $('#bName').value,
         phone: $('#bPhone').value,
@@ -145,30 +252,99 @@ $('#bSubmit').onclick = async() => {
         time: $('#bTime').value
     };
     const id = $('#bId').value;
+    if (!token) {
+        pendingBookingDraft = data;
+        $('#siEmail').value = data.email;
+        say($('#siMsg'), 'Please sign in or create an account to book. Your appointment details are saved.');
+        open('#mSignin');
+        return;
+    }
+    const submit = $('#bSubmit');
+    submit.disabled = true;
     try {
-        await api(id ? '/bookings/' + id : '/bookings', id ? 'PUT' : 'POST', data);
-        say($('#bMsg'), '✔ Done! Confirmation email sent to ' + data.email);
+        const result = await api(id ? '/bookings/' + id : '/bookings', id ? 'PUT' : 'POST', data);
+        say($('#bMsg'), result.message || (result.emailSent ?
+            'Your appointment was saved and the confirmation email was sent.' :
+            'Your appointment was saved, but the confirmation email could not be sent. Please contact the shop to confirm delivery.'),
+        result.emailSent === false ? 'warning' : undefined);
         loadBookings();
-        setTimeout(close, 2000);
-    } catch (e) { say($('#bMsg'), e.message, true); }
-};
+    } catch (e) {
+        say($('#bMsg'), e.message, 'error');
+    } finally {
+        submit.disabled = false;
+    }
+});
 
 /* ----- read / edit / delete bookings ----- */
 let cache = [];
 async function loadBookings() {
     try {
         cache = await api('/bookings');
-        $('#bookTable').innerHTML = `<tr><th>Name</th><th>Phone</th><th>Email</th><th>Service</th><th>Price</th><th>Date</th><th>Time</th><th>Booked At</th><th>Action</th></tr>` +
-            (cache.length ? cache.map(b => `<tr>
-        <td>${b.name}</td><td>${b.phone}</td><td>${b.email}</td><td>${b.service}</td><td>Rs ${b.price}</td>
-        <td>${b.date}</td><td>${b.time}</td><td>${new Date(b.createdAt).toLocaleString()}</td>
-        <td><button class="edit" data-edit="${b.id}">Edit</button><button class="del" data-del="${b.id}">Delete</button></td></tr>`).join('') :
-                '<tr><td colspan="9">No bookings yet.</td></tr>');
-    } catch (e) { if (e.message.includes('sign in')) logout(); }
+        const table = $('#bookTable');
+        table.replaceChildren();
+        const columns = ['Name', 'Phone', 'Email', 'Service', 'Price', 'Date', 'Time', 'Booked At', 'Action'];
+        const header = document.createElement('tr');
+        columns.forEach(text => {
+            const cell = document.createElement('th');
+            cell.textContent = text;
+            header.append(cell);
+        });
+        table.append(header);
+        if (!cache.length) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = columns.length;
+            cell.textContent = 'No bookings yet. Choose a service to schedule your first visit.';
+            row.append(cell);
+            table.append(row);
+            return;
+        }
+        cache.forEach(booking => {
+            const row = document.createElement('tr');
+            [
+                booking.name,
+                booking.phone,
+                booking.email,
+                booking.service,
+                `Rs ${booking.price}`,
+                booking.date,
+                booking.time,
+                new Date(booking.createdAt).toLocaleString()
+            ].forEach(text => {
+                const cell = document.createElement('td');
+                cell.textContent = text;
+                row.append(cell);
+            });
+            const actions = document.createElement('td');
+            const edit = document.createElement('button');
+            edit.className = 'edit';
+            edit.dataset.edit = booking.id;
+            edit.textContent = 'Edit';
+            const remove = document.createElement('button');
+            remove.className = 'del';
+            remove.dataset.del = booking.id;
+            remove.textContent = 'Cancel';
+            actions.append(edit, remove);
+            row.append(actions);
+            table.append(row);
+        });
+    } catch (e) {
+        if (e.message.includes('sign in')) logout();
+        else {
+            const cell = document.createElement('td');
+            cell.colSpan = 9;
+            cell.textContent = e.message;
+            const row = document.createElement('tr');
+            row.append(cell);
+            $('#bookTable').replaceChildren(row);
+        }
+    }
 }
 document.addEventListener('click', async e => {
-    if (e.target.dataset.edit) {
-        const b = cache.find(x => x.id === e.target.dataset.edit);
+    const editButton = e.target.closest('[data-edit]');
+    if (editButton) {
+        const b = cache.find(x => x.id === editButton.dataset.edit);
+        if (!b) return;
         $('#bookTitle').textContent = 'Edit Booking';
         $('#bId').value = b.id;
         $('#bService').value = b.service;
@@ -181,9 +357,14 @@ document.addEventListener('click', async e => {
         say($('#bMsg'), '');
         open('#mBook');
     }
-    if (e.target.dataset.del && confirm('Cancel this booking?')) {
-        try { await api('/bookings/' + e.target.dataset.del, 'DELETE');
-            loadBookings(); } catch (err) { alert(err.message); }
+    const deleteButton = e.target.closest('[data-del]');
+    if (deleteButton && confirm('Cancel this appointment?')) {
+        try {
+            await api('/bookings/' + deleteButton.dataset.del, 'DELETE');
+            loadBookings();
+        } catch (err) {
+            alert(err.message);
+        }
     }
 });
 
