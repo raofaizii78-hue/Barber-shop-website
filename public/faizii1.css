@@ -2,7 +2,9 @@
     --gold: #d4a017;
     --dark: #0e0e0e;
     --card: #1b1b1b;
-    --text: #f2f2f2
+    --text: #f2f2f2;
+    --muted: #a9adb3;
+    --line: rgba(255, 255, 255, .1)
 }
 
 * {
@@ -17,8 +19,9 @@ html {
 }
 
 body {
-    background: var(--dark);
-    color: var(--text)
+    background: radial-gradient(circle at 75% -10%, #27231a 0, transparent 35%), var(--dark);
+    color: var(--text);
+    line-height: 1.5
 }
 
 header {
@@ -32,7 +35,8 @@ header {
     gap: 10px;
     padding: 10px 5%;
     background: #000;
-    border-bottom: 2px solid var(--gold)
+    border-bottom: 1px solid rgba(212, 160, 23, .55);
+    backdrop-filter: blur(14px)
 }
 
 #authBox {
@@ -161,8 +165,12 @@ nav a:hover {
 }
 
 section {
-    padding: 60px 5%
+    padding: 76px 5%;
+    max-width: 1280px;
+    margin: 0 auto
 }
+
+.section-kicker { color: var(--gold); text-align: center; font-size: .72rem; font-weight: 800; letter-spacing: .24em; margin-bottom: 8px }
 
 section[hidden] {
     display: none
@@ -187,12 +195,13 @@ h2 {
     overflow: hidden;
     text-align: center;
     border: 1px solid #333;
-    transition: .3s
+    transition: transform .3s, border-color .3s, box-shadow .3s
 }
 
 .card:hover {
     transform: translateY(-6px);
-    border-color: var(--gold)
+    border-color: var(--gold);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .25)
 }
 
 .card .pic {
@@ -220,6 +229,8 @@ h2 {
 .card h3 {
     margin: 12px 0 4px
 }
+
+.card-copy { color: var(--muted); min-height: 44px; padding: 0 18px; font-size: .9rem }
 
 .price {
     color: var(--gold);
@@ -253,6 +264,8 @@ h2 {
     line-height: 2.2;
     font-size: 1.1rem
 }
+
+.contact p { color: var(--muted) }
 
 footer {
     text-align: center;
@@ -457,6 +470,8 @@ td button {
         width: min(88vw, 430px);
         transform: none
     }
+
+    .hero-photo img { height: 260px }
 
     section {
         padding: 44px 5%

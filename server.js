@@ -408,15 +408,21 @@ app.post('/api/bookings', auth, asyncHandler(async(req, res) => {
         time: b.time,
         createdAt: new Date().toISOString()
     };
-    try {
-        const saved = supabaseResponseBookings(
-            await supabaseRequest('appointments', '', 'POST', [toSupabaseBooking(booking)]),
-            'create'
-        );
-        if (saved.length !== 1) throw supabaseError('Supabase did not confirm that the appointment was saved.');
-        Object.assign(booking, saved[0]);
-    } catch (error) {
-        return reportSupabaseError(res, 'create', error);
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+            const saved = supabaseResponseBookings(
+                await supabaseRequest('appointments', '', 'POST', [toSupabaseBooking(booking)]),
+                'create'
+            );
+            if (saved.length !== 1) throw supabaseError('Supabase did not confirm that the appointment was saved.');
+            Object.assign(booking, saved[0]);
+        } catch (error) {
+            return reportSupabaseError(res, 'create', error);
+        }
+    } else {
+        const db = load();
+        db.bookings.push(booking);
+        save(db);
     }
     const emailSent = await sendMail(booking.email, 'Appointment confirmed | Faizii Barber Shop', bookingMail(booking, 'Your appointment is confirmed'));
     if (emailConfigured && isEmail(adminEmail) && !adminEmail.includes('yourshop'))
@@ -431,6 +437,10 @@ app.post('/api/bookings', auth, asyncHandler(async(req, res) => {
 }));
 
 app.get('/api/bookings', auth, asyncHandler(async(req, res) => {
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+        const localBookings = load().bookings.filter(b => req.user.role === 'admin' || b.userId === req.user.id);
+        return res.json(localBookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+    }
     try {
         const query = new URLSearchParams({ select: '*', order: 'created_at.desc' });
         if (req.user.role !== 'admin') query.set('user_id', `eq.${req.user.id}`);
@@ -463,7 +473,12 @@ app.put('/api/bookings/:id', auth, asyncHandler(async(req, res) => {
         createdAt: legacyBooking ? legacyBooking.createdAt : undefined,
         updatedAt: new Date().toISOString()
     };
-    try {
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+        if (!legacyBooking) return res.status(404).json({ error: 'Booking not found' });
+        db.bookings = db.bookings.map(booking => booking === legacyBooking ? updated : booking);
+        save(db);
+        Object.assign(updated, legacyBooking, { ...updated });
+    } else try {
         const query = new URLSearchParams({ select: '*', id: `eq.${req.params.id}` });
         if (!legacyBooking && req.user.role !== 'admin') query.set('user_id', `eq.${req.user.id}`);
         const saved = legacyBooking ?
@@ -506,7 +521,7 @@ app.delete('/api/bookings/:id', auth, asyncHandler(async(req, res) => {
     if (legacyBooking) {
         db.bookings = db.bookings.filter(x => x !== legacyBooking);
         save(db);
-    } else {
+    } else if (SUPABASE_SERVICE_ROLE_KEY) {
         const query = new URLSearchParams({ select: '*', id: `eq.${req.params.id}` });
         if (req.user.role !== 'admin') query.set('user_id', `eq.${req.user.id}`);
         try {
@@ -516,6 +531,8 @@ app.delete('/api/bookings/:id', auth, asyncHandler(async(req, res) => {
         } catch (error) {
             return reportSupabaseError(res, 'delete', error);
         }
+    } else {
+        if (!b) return res.status(404).json({ error: 'Booking not found' });
     }
     const emailSent = await sendMail(b.email, 'Appointment cancelled | Faizii Barber Shop', bookingMail(b, 'Your appointment was cancelled'));
     res.json({

@@ -36,8 +36,8 @@ SERVICES[5].img = 'https://lynfordbarbershop.com/images/services-and-treatment-p
 $('#serviceGrid').innerHTML = SERVICES.map((s, i) => `
   <div class="card">
     <img src="${s.img.startsWith('http') ? s.img : 'images/' + s.img}" alt="${s.name} service at Faizii Barber Shop" loading="lazy" onerror="this.outerHTML='<div class=pic>${s.icon}</div>'">
-    <h3>${s.name}</h3><div class="price">Rs ${s.price}</div>
-    <button class="btn" data-book="${i}">Booking</button>
+    <h3>${s.name}</h3><p class="card-copy">Professional service, tailored to your style.</p><div class="price">Rs ${s.price}</div>
+    <button class="btn" data-book="${i}">Book this service</button>
   </div>`).join('');
 $('#offerGrid').innerHTML = OFFERS.map(o => `<div class="offer"><b>${o.t}</b><p>${o.d}</p></div>`).join('');
 
