@@ -43,9 +43,10 @@ $('#offerGrid').innerHTML = OFFERS.map(o => `<div class="offer"><b>${o.t}</b><p>
 
 /* ----- helpers ----- */
 async function api(url, method = 'GET', body) {
+    const endpoint = '/api' + url;
     let r;
     try {
-        r = await fetch('/api' + url, {
+        r = await fetch(endpoint, {
             method,
             headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
             body: body ? JSON.stringify(body) : undefined
@@ -54,14 +55,39 @@ async function api(url, method = 'GET', body) {
         throw new Error('Could not connect to the shop. Make sure the website server is running and try again.');
     }
     const text = await r.text();
+    const contentType = r.headers.get('content-type') || '';
     let d;
-    try {
-        d = text ? JSON.parse(text) : {};
-    } catch {
-        throw new Error(`Server returned an invalid response (HTTP ${r.status})`);
+    const trimmedText = text.trimStart();
+    if (text && (contentType.includes('application/json') || trimmedText.startsWith('{') || trimmedText.startsWith('['))) {
+        try {
+            d = JSON.parse(text);
+        } catch {
+            d = null;
+        }
     }
-    if (!r.ok) throw new Error(d.error || 'Something went wrong');
-    if (!text) throw new Error(`Server returned an empty response (HTTP ${r.status})`);
+    if (!r.ok) {
+        const messages = {
+            400: 'Please check the information you entered and try again.',
+            401: 'Please sign in again to continue.',
+            403: 'You do not have permission to do that.',
+            404: `The API endpoint ${endpoint} was not found.`,
+            409: 'This request conflicts with existing information. Check your details and try again.',
+            500: 'The shop server encountered an error. Please try again later.'
+        };
+        const message = d && typeof d.error === 'string' ? d.error :
+            r.status === 404 && (!contentType.includes('application/json') || !d || typeof d.error !== 'string') ?
+            `The API endpoint ${endpoint} returned a non-JSON 404. This deployment may not be routing requests to the Express API; check the Vercel project root and deployment logs.` :
+            messages[r.status] || `The shop server returned HTTP ${r.status}. Please try again later.`;
+        console.warn('Shop API request failed:', { method, endpoint, status: r.status, contentType });
+        if (r.status === 401 && token) logout();
+        const error = new Error(message);
+        error.status = r.status;
+        throw error;
+    }
+    if (!d || typeof d !== 'object' || Array.isArray(d)) {
+        console.warn('Shop API returned an unexpected response:', { method, endpoint, status: r.status, contentType });
+        throw new Error(`The shop server returned an invalid response for ${endpoint} (HTTP ${r.status}).`);
+    }
     return d;
 }
 const open = id => { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
@@ -226,6 +252,10 @@ document.addEventListener('click', e => {
     if (!bookButton) return;
     const i = bookButton.dataset.book;
     const s = SERVICES[i];
+    if (!s) {
+        say($('#bMsg'), 'This service is unavailable. Please refresh the page and choose another service.', 'error');
+        return;
+    }
     $('#bookTitle').textContent = 'Book Appointment';
     $('#bId').value = '';
     $('#bService').value = s.name;
