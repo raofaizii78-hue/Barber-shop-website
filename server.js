@@ -12,24 +12,26 @@ const bcrypt = require('bcryptjs'),
 
 const app = express();
 app.use(express.json({ limit: '32kb' }));
+const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 
 const SUPABASE_REST_URL = (process.env.SUPABASE_REST_URL || 'https://igowvkdyyxaczkhlgkie.supabase.co/rest/v1').replace(/\/+$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const isVercel = process.env.VERCEL === '1';
 
 const supabaseError = (message, status = 502) => Object.assign(new Error(message), { status });
-const supabaseRequest = async (query = '', method = 'GET', body) => {
+const supabaseRequest = async (table, query = '', method = 'GET', body, prefer) => {
     if (!SUPABASE_SERVICE_ROLE_KEY)
         throw supabaseError('Supabase is not configured. Add SUPABASE_SERVICE_ROLE_KEY to faizii1.env.local.', 503);
 
     let response;
     try {
-        response = await fetch(`${SUPABASE_REST_URL}/appointments${query}`, {
+        response = await fetch(`${SUPABASE_REST_URL}/${table}${query}`, {
             method,
             headers: {
                 apikey: SUPABASE_SERVICE_ROLE_KEY,
                 Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
                 'Content-Type': 'application/json',
-                ...(method === 'GET' ? {} : { Prefer: 'return=representation' })
+                ...(method === 'GET' ? {} : { Prefer: prefer || 'return=representation' })
             },
             body: body === undefined ? undefined : JSON.stringify(body)
         });
@@ -48,8 +50,9 @@ const supabaseRequest = async (query = '', method = 'GET', body) => {
     if (!response.ok) {
         const detail = result && (result.message || result.details);
         throw supabaseError(detail ?
-            `Supabase rejected the appointment request: ${detail}` :
-            `Supabase appointment request failed (HTTP ${response.status}).`);
+            `Supabase rejected the ${table} request: ${detail}` :
+            `Supabase ${table} request failed (HTTP ${response.status}).`,
+        response.status === 409 || (result && result.code === '23505') ? 409 : 502);
     }
     return result;
 };
@@ -84,6 +87,8 @@ const jwtSecret = (() => {
     const configured = process.env.JWT_SECRET;
     if (configured && configured.length >= 32 && !configured.toLowerCase().includes('change_this'))
         return configured;
+    if (isVercel)
+        throw new Error('Set a private JWT_SECRET of at least 32 characters in the Vercel project environment variables.');
 
     const secretFile = path.join(__dirname, '.jwt-secret');
     try {
@@ -146,6 +151,18 @@ const isEmail = e => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
 const normalizeEmail = email => typeof email === 'string' ? email.trim().toLowerCase() : '';
 const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
 const sign = u => jwt.sign({ id: u.id, name: u.name, email: u.email, role: u.role }, jwtSecret, { expiresIn: '7d' });
+const requireAuthStorage = () => {
+    if (isVercel && !SUPABASE_SERVICE_ROLE_KEY)
+        throw supabaseError('Account storage is not configured. Set SUPABASE_SERVICE_ROLE_KEY in the Vercel project environment variables.', 503);
+};
+const findUser = async email => {
+    requireAuthStorage();
+    if (!SUPABASE_SERVICE_ROLE_KEY) return load().users.find(user => user.email === email) || null;
+    const query = new URLSearchParams({ select: 'id,name,email,password_hash,role,created_at', email: `eq.${email}`, limit: '1' });
+    const users = await supabaseRequest('app_users', `?${query}`);
+    if (!Array.isArray(users)) throw supabaseError('Supabase did not return account data.');
+    return users[0] || null;
+};
 const auth = (req, res, next) => {
     try {
         const authorization = req.headers.authorization || '';
@@ -158,21 +175,18 @@ const auth = (req, res, next) => {
 };
 
 /* ---------- pages (only safe files are public) ---------- */
-const page = f => (req, res) => res.sendFile(path.join(__dirname, f));
-app.get('/', page('faizii1.html'));
-app.get('/faizii1.css', page('faizii1.css'));
-app.get('/faizii1.js', page('faizii1.js'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
 /* ---------- sign up / sign in ---------- */
-app.post('/api/signup', async(req, res) => {
+app.post('/api/signup', asyncHandler(async(req, res) => {
     const { name, password } = req.body || {};
     const email = normalizeEmail(req.body && req.body.email);
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 120 || !isEmail(email) ||
         typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72)
         return res.status(400).json({ error: 'Enter your name, a valid email, and a password with at least 8 characters.' });
-    const db = load();
-    if (db.users.find(u => u.email === email)) return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
+    requireAuthStorage();
+    if (await findUser(email)) return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
     const user = {
         id: uid(),
         name: name.trim(),
@@ -181,29 +195,50 @@ app.post('/api/signup', async(req, res) => {
         role: email === adminEmail && isEmail(adminEmail) && !adminEmail.includes('yourshop') ? 'admin' : 'user',
         createdAt: new Date().toISOString()
     };
-    db.users.push(user);
-    save(db);
+    try {
+        if (SUPABASE_SERVICE_ROLE_KEY) {
+            await supabaseRequest('app_users', '', 'POST', [{
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                password_hash: user.hash,
+                role: user.role,
+                created_at: user.createdAt
+            }]);
+        } else {
+            const db = load();
+            db.users.push(user);
+            save(db);
+        }
+    } catch (error) {
+        if (error.status === 409) return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
+        throw error;
+    }
     await sendMail(user.email, 'Welcome to Faizii Barber Shop', `<h2>Welcome, ${escapeHtml(user.name)}!</h2><p>Your account is ready. Book your next style with us.</p>`);
     res.json({ token: sign(user), user: { name: user.name, email: user.email, role: user.role } });
-});
+}));
 
-app.post('/api/signin', async(req, res) => {
+app.post('/api/signin', asyncHandler(async(req, res) => {
     const { password } = req.body || {};
     const email = normalizeEmail(req.body && req.body.email);
     if (typeof password !== 'string' || Buffer.byteLength(password, 'utf8') > 72)
         return res.status(400).json({ error: 'Enter your email and password.' });
-    const user = load().users.find(u => u.email === email);
+    const storedUser = await findUser(email);
+    const user = storedUser && {
+        ...storedUser,
+        hash: storedUser.password_hash || storedUser.hash,
+        createdAt: storedUser.created_at || storedUser.createdAt
+    };
     if (!user || !(await bcrypt.compare(password || '', user.hash))) return res.status(400).json({ error: 'Wrong email or password' });
     res.json({ token: sign(user), user: { name: user.name, email: user.email, role: user.role } });
-});
+}));
 
 /* ---------- forgot / reset password ---------- */
-app.post('/api/forgot', async(req, res) => {
+app.post('/api/forgot', asyncHandler(async(req, res) => {
     const email = normalizeEmail(req.body && req.body.email);
     if (!isEmail(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
     if (!mailer) return res.status(503).json({ error: 'Password recovery email is not configured. Please contact the shop.' });
-    const db = load();
-    if (db.users.find(u => u.email === email)) {
+    if (await findUser(email)) {
         const code = String(crypto.randomInt(100000, 1000000));
         const codeHash = crypto.createHash('sha256').update(code).digest('hex');
         const delivered = await sendMail(email, 'Faizii Barber Shop - Password reset code', `
@@ -214,36 +249,75 @@ app.post('/api/forgot', async(req, res) => {
             <p>This code expires in 15 minutes. If you did not request a password reset, you can ignore this email.</p>
           </div>`);
         if (!delivered) return res.status(503).json({ error: 'We could not send the reset email. Please try again later.' });
-        db.resets = db.resets.filter(r => r.email !== email);
-        db.resets.push({ email, codeHash, attempts: 0, expires: Date.now() + 15 * 60 * 1000 });
-        save(db);
+        const expires = Date.now() + 15 * 60 * 1000;
+        if (SUPABASE_SERVICE_ROLE_KEY) {
+            await supabaseRequest('password_resets', '', 'POST', [{
+                email,
+                code_hash: codeHash,
+                attempts: 0,
+                expires_at: new Date(expires).toISOString()
+            }], 'resolution=merge-duplicates,return=minimal');
+        } else {
+            const db = load();
+            db.resets = db.resets.filter(reset => reset.email !== email);
+            db.resets.push({ email, codeHash, attempts: 0, expires });
+            save(db);
+        }
     }
     res.json({ message: 'If this email is registered, a reset code has been sent.' });
-});
+}));
 
-app.post('/api/reset', async(req, res) => {
+app.post('/api/reset', asyncHandler(async(req, res) => {
     const { code, password } = req.body || {};
     const email = normalizeEmail(req.body && req.body.email);
     if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72)
         return res.status(400).json({ error: 'Your new password must contain at least 8 characters.' });
-    const db = load();
-    const r = db.resets.find(x => x.email === email && x.expires > Date.now() && (x.attempts || 0) < RESET_MAX_ATTEMPTS);
+    requireAuthStorage();
+    const db = SUPABASE_SERVICE_ROLE_KEY ? null : load();
+    let r;
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+        const query = new URLSearchParams({
+            select: 'email,code_hash,attempts,expires_at',
+            email: `eq.${email}`,
+            expires_at: `gt.${new Date().toISOString()}`,
+            attempts: `lt.${RESET_MAX_ATTEMPTS}`,
+            limit: '1'
+        });
+        const resets = await supabaseRequest('password_resets', `?${query}`);
+        if (!Array.isArray(resets)) throw supabaseError('Supabase did not return password reset data.');
+        r = resets[0] || null;
+    } else {
+        r = db.resets.find(reset => reset.email === email && reset.expires > Date.now() && (reset.attempts || 0) < RESET_MAX_ATTEMPTS);
+    }
     if (!r) return res.status(400).json({ error: 'The code is invalid or expired. Request a new code and try again.' });
     const submittedHash = crypto.createHash('sha256').update(String(code || '')).digest();
-    const storedHash = Buffer.from(r.codeHash || crypto.createHash('sha256').update(String(r.code || '')).digest('hex'), 'hex');
+    const storedCodeHash = r.code_hash || r.codeHash || crypto.createHash('sha256').update(String(r.code || '')).digest('hex');
+    const storedHash = Buffer.from(storedCodeHash, 'hex');
     const codeMatches = submittedHash.length === storedHash.length && crypto.timingSafeEqual(submittedHash, storedHash);
     if (!codeMatches) {
         r.attempts = (r.attempts || 0) + 1;
-        save(db);
+        if (SUPABASE_SERVICE_ROLE_KEY) {
+            const query = new URLSearchParams({ email: `eq.${email}` });
+            await supabaseRequest('password_resets', `?${query}`, 'PATCH', { attempts: r.attempts });
+        } else {
+            save(db);
+        }
         return res.status(400).json({ error: 'The code is invalid or expired. Request a new code and try again.' });
     }
-    const user = db.users.find(u => u.email === r.email);
+    const user = await findUser(r.email);
     if (!user) return res.status(400).json({ error: 'The code is invalid or expired. Request a new code and try again.' });
-    user.hash = await bcrypt.hash(password, 10);
-    db.resets = db.resets.filter(x => x !== r);
-    save(db);
+    const passwordHash = await bcrypt.hash(password, 10);
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+        const userQuery = new URLSearchParams({ email: `eq.${email}` });
+        await supabaseRequest('app_users', `?${userQuery}`, 'PATCH', { password_hash: passwordHash });
+        await supabaseRequest('password_resets', `?${userQuery}`, 'DELETE');
+    } else {
+        user.hash = passwordHash;
+        db.resets = db.resets.filter(reset => reset !== r);
+        save(db);
+    }
     res.json({ message: 'Password changed. Please sign in.' });
-});
+}));
 
 /* ---------- bookings: create / read / edit / delete ---------- */
 const SERVICES = new Map([
@@ -319,7 +393,7 @@ const reportSupabaseError = (res, operation, error) => {
     return res.status(error.status || 502).json({ error: error.message || 'Supabase appointment request failed.' });
 };
 
-app.post('/api/bookings', auth, async(req, res) => {
+app.post('/api/bookings', auth, asyncHandler(async(req, res) => {
     const b = req.body;
     if (!validBooking(b)) return res.status(400).json({ error: 'Please enter valid appointment details and choose one of our listed services.' });
     const booking = {
@@ -336,7 +410,7 @@ app.post('/api/bookings', auth, async(req, res) => {
     };
     try {
         const saved = supabaseResponseBookings(
-            await supabaseRequest('', 'POST', [toSupabaseBooking(booking)]),
+            await supabaseRequest('appointments', '', 'POST', [toSupabaseBooking(booking)]),
             'create'
         );
         if (saved.length !== 1) throw supabaseError('Supabase did not confirm that the appointment was saved.');
@@ -354,22 +428,22 @@ app.post('/api/bookings', auth, async(req, res) => {
             `Your appointment is confirmed. A confirmation email was sent to ${booking.email}.` :
             'Your appointment is saved, but the confirmation email could not be sent. Please contact the shop to confirm delivery.'
     });
-});
+}));
 
-app.get('/api/bookings', auth, async(req, res) => {
+app.get('/api/bookings', auth, asyncHandler(async(req, res) => {
     try {
         const query = new URLSearchParams({ select: '*', order: 'created_at.desc' });
         if (req.user.role !== 'admin') query.set('user_id', `eq.${req.user.id}`);
-        const saved = supabaseResponseBookings(await supabaseRequest(`?${query}`), 'list');
+        const saved = supabaseResponseBookings(await supabaseRequest('appointments', `?${query}`), 'list');
         const legacy = load().bookings.filter(b => req.user.role === 'admin' || b.userId === req.user.id);
         const appointments = new Map([...legacy, ...saved].map(booking => [booking.id, booking]));
         res.json([...appointments.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (error) {
         return reportSupabaseError(res, 'list', error);
     }
-});
+}));
 
-app.put('/api/bookings/:id', auth, async(req, res) => {
+app.put('/api/bookings/:id', auth, asyncHandler(async(req, res) => {
     const db = load();
     const legacyBooking = db.bookings.find(x => x.id === req.params.id);
     if (legacyBooking && req.user.role !== 'admin' && legacyBooking.userId !== req.user.id)
@@ -393,8 +467,8 @@ app.put('/api/bookings/:id', auth, async(req, res) => {
         const query = new URLSearchParams({ select: '*', id: `eq.${req.params.id}` });
         if (!legacyBooking && req.user.role !== 'admin') query.set('user_id', `eq.${req.user.id}`);
         const saved = legacyBooking ?
-            supabaseResponseBookings(await supabaseRequest('', 'POST', [toSupabaseBooking(updated)]), 'update') :
-            supabaseResponseBookings(await supabaseRequest(`?${query}`, 'PATCH', {
+            supabaseResponseBookings(await supabaseRequest('appointments', '', 'POST', [toSupabaseBooking(updated)]), 'update') :
+            supabaseResponseBookings(await supabaseRequest('appointments', `?${query}`, 'PATCH', {
                 name: updated.name,
                 phone: updated.phone,
                 email: updated.email,
@@ -421,9 +495,9 @@ app.put('/api/bookings/:id', auth, async(req, res) => {
             `Your appointment was updated. A confirmation email was sent to ${updated.email}.` :
             'Your appointment was updated, but the confirmation email could not be sent. Please contact the shop to confirm delivery.'
     });
-});
+}));
 
-app.delete('/api/bookings/:id', auth, async(req, res) => {
+app.delete('/api/bookings/:id', auth, asyncHandler(async(req, res) => {
     const db = load();
     const legacyBooking = db.bookings.find(x => x.id === req.params.id);
     let b = legacyBooking;
@@ -436,7 +510,7 @@ app.delete('/api/bookings/:id', auth, async(req, res) => {
         const query = new URLSearchParams({ select: '*', id: `eq.${req.params.id}` });
         if (req.user.role !== 'admin') query.set('user_id', `eq.${req.user.id}`);
         try {
-            const deleted = supabaseResponseBookings(await supabaseRequest(`?${query}`, 'DELETE'), 'delete');
+            const deleted = supabaseResponseBookings(await supabaseRequest('appointments', `?${query}`, 'DELETE'), 'delete');
             if (deleted.length !== 1) return res.status(404).json({ error: 'Booking not found' });
             [b] = deleted;
         } catch (error) {
@@ -451,7 +525,7 @@ app.delete('/api/bookings/:id', auth, async(req, res) => {
             `Your appointment was cancelled. A confirmation email was sent to ${b.email}.` :
             'Your appointment was cancelled, but the confirmation email could not be sent.'
     });
-});
+}));
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found' }));
 app.use((err, req, res, next) => {
@@ -462,8 +536,12 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Faizii Barber Shop running: http://localhost:${PORT}`);
-    if (!SUPABASE_SERVICE_ROLE_KEY) console.warn('Supabase is not configured. Add SUPABASE_SERVICE_ROLE_KEY to faizii1.env.local to save new appointments.');
-    if (!emailConfigured) console.warn('Email is not configured. Add EMAIL_USER and EMAIL_PASS to faizii1.env.local to send booking confirmations and password reset codes.');
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Faizii Barber Shop running: http://localhost:${PORT}`);
+        if (!SUPABASE_SERVICE_ROLE_KEY) console.warn('Supabase is not configured. Add SUPABASE_SERVICE_ROLE_KEY to faizii1.env.local to save appointments and use deployed account storage.');
+        if (!emailConfigured) console.warn('Email is not configured. Add EMAIL_USER and EMAIL_PASS to faizii1.env.local to send booking confirmations and password reset codes.');
+    });
+}
+
+module.exports = app;
